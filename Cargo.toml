@@ -1,0 +1,12 @@
+[package]
+name = "ohmae-caml"
+version = "0.0.0"
+authors = ["rhysd <lin90162@yahoo.co.jp>"]
+description = "One of MinCaml implementations"
+repository = "https://github.com/rhysd/OhmaeCaml"
+readme = "README.md"
+include = ["src/*.rs", "Cargo.toml", "LICENSE.txt"]
+license = "MIT"
+
+[dependencies]
+nom = "^2.0"
