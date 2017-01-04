@@ -9,4 +9,7 @@ include = ["src/*.rs", "Cargo.toml", "LICENSE.txt"]
 license = "MIT"
 
 [dependencies]
-nom = "^2.0"
+
+[dependencies.nom]
+version = "^2.0"
+features = ["verbose-errors"]

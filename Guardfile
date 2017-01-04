@@ -1,6 +1,6 @@
 def run(f)
   puts "\033[93m#{Time.now}: #{f}\033[0m"
-  success = system 'cargo build'
+  success = system 'cargo build --verbose'
   puts (
     if success
       "\033[92mOK\033[0m\n\n"
@@ -12,7 +12,7 @@ def run(f)
 end
 
 guard :shell do
-  watch %r[^.+\.rs?$] do |m|
+  watch /^(:?Cargo.toml|.+\.rs)$/ do |m|
     run m[0]
   end
 end
