@@ -17,7 +17,7 @@ pub enum Expr {
 
 #[derive(Debug)]
 pub enum Constant {
-    Num(f64),
+    Num(Num),
 }
 
 #[derive(Debug)]
@@ -36,6 +36,12 @@ pub fn bin_op_from_char(ch: char) -> BinOp {
         '/' => BinOp::Div,
         _   => panic!("Invalid binary operator {}", ch),
     }
+}
+
+#[derive(Debug)]
+pub struct Num {
+    pub value: f64,
+    pub rest: usize,
 }
 
 #[derive(Debug)]
