@@ -21,7 +21,7 @@ fn bin_op_from_char(ch: char) -> BinOp {
         '-' => BinOp::Sub,
         '*' => BinOp::Mul,
         '/' => BinOp::Div,
-        _   => panic!("Invalid binary operator {}", ch),
+        _   => unreachable!("Invalid binary operator {}", ch),
     }
 }
 
@@ -29,7 +29,7 @@ fn unary_op_from_char(ch: char) -> UnaryOp {
     match ch {
         '-' => UnaryOp::Neg,
         '+' => UnaryOp::Pos,
-        _ => panic!("Invalid unary operator {}", ch),
+        _ => unreachable!("Invalid unary operator {}", ch),
     }
 }
 
