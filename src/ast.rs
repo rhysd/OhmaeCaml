@@ -35,33 +35,37 @@ pub struct Program {
     pub body: Vec<Expr>,
 }
 
-#[derive(Debug)]
-pub enum Expr {
-    Constant(Constant),
-    BinOpExpr(BinOpExpr),
-    UnaryOpExpr(UnaryOpExpr),
-}
-
-impl GetOffset for Expr {
-    fn get_offset(&self) -> usize {
-        match *self {
-            Expr::Constant(ref c) => c.get_offset(),
-            Expr::BinOpExpr(ref e) => e.get_offset(),
-            Expr::UnaryOpExpr(ref e) => e.get_offset(),
-        }
+macro_rules! enum_nodes {
+    ($($n:ident { $($m:ident,)+ })+) => {
+        $(
+            #[derive(Debug)]
+            pub enum $n {
+                $(
+                    $m($m),
+                )+
+            }
+            impl GetOffset for $n {
+                fn get_offset(&self) -> usize {
+                    match *self {
+                        $(
+                            $n::$m(ref m) => m.get_offset(),
+                        )+
+                    }
+                }
+            }
+        )+
     }
 }
 
-#[derive(Debug)]
-pub enum Constant {
-    Num(Num),
-}
+enum_nodes! {
+    Expr {
+        Constant,
+        BinOpExpr,
+        UnaryOpExpr,
+    }
 
-impl GetOffset for Constant {
-    fn get_offset(&self) -> usize {
-        match *self {
-            Constant::Num(ref n) => n.get_offset(),
-        }
+    Constant {
+        Num,
     }
 }
 
