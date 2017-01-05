@@ -3,14 +3,16 @@
 mod ast;
 mod parser;
 mod error;
+mod compiler;
 
 use std::env;
 use std::io;
 use std::fs;
 use std::io::Read;
+use std::process::exit;
 
-use parser::parse;
 use error::Error;
+use compiler::Compiler;
 
 fn read_source(argv: Vec<String>) -> io::Result<String> {
     let mut buf = String::new();
@@ -24,9 +26,17 @@ fn read_source(argv: Vec<String>) -> io::Result<String> {
 }
 
 fn main() {
-    // let code = read_source(env::args().collect::<Vec<_>>()).expect("Error on reading source code");
-    match parse("1.1e2+10") {
-        Ok(ast) => println!("AST: {:?}", ast),
-        Err(Error::OnParse{msg}) => println!("{}", msg),
-    }
+    let code = read_source(env::args().collect::<Vec<_>>()).expect("Error on reading source code");
+    let compiler = Compiler::new(code.as_str());
+    let code = match compiler.parse() {
+        Ok(ast) => {
+            println!("AST: {:?}", ast);
+            0
+        },
+        Err(Error::OnParse{msg}) => {
+            println!("{}", msg);
+            4
+        },
+    };
+    exit(code);
 }

@@ -11,9 +11,12 @@ pub trait GetOffset {
 }
 
 pub fn get_pos<S: AsRef<str>, G: GetOffset>(s: S, g: G) -> Position {
+    let bytes = s.as_ref().as_bytes();
+    let offset = bytes.len() - g.get_offset();
+
     let mut l = 1usize;
     let mut c = 1usize;
-    for b in s.as_ref().as_bytes() {
+    for b in &bytes[..offset] {
         match char::from_u32(*b as u32) {
             Some('\n') => {
                 l += 1;
