@@ -39,6 +39,7 @@ pub struct Program {
 pub enum Expr {
     Constant(Constant),
     BinOpExpr(BinOpExpr),
+    UnaryOpExpr(UnaryOpExpr),
 }
 
 impl GetOffset for Expr {
@@ -46,6 +47,7 @@ impl GetOffset for Expr {
         match *self {
             Expr::Constant(ref c) => c.get_offset(),
             Expr::BinOpExpr(ref e) => e.get_offset(),
+            Expr::UnaryOpExpr(ref e) => e.get_offset(),
         }
     }
 }
@@ -93,6 +95,24 @@ pub struct BinOpExpr {
 impl GetOffset for BinOpExpr {
     fn get_offset(&self) -> usize {
         (*self.lhs).get_offset()
+    }
+}
+
+#[derive(Debug)]
+pub enum UnaryOp {
+    Pos,
+    Neg,
+}
+
+#[derive(Debug)]
+pub struct UnaryOpExpr {
+    pub op: UnaryOp,
+    pub child: Box<Expr>,
+}
+
+impl GetOffset for UnaryOpExpr {
+    fn get_offset(&self) -> usize {
+        (*self.child).get_offset()
     }
 }
 

@@ -25,6 +25,14 @@ fn bin_op_from_char(ch: char) -> BinOp {
     }
 }
 
+fn unary_op_from_char(ch: char) -> UnaryOp {
+    match ch {
+        '-' => UnaryOp::Neg,
+        '+' => UnaryOp::Pos,
+        _ => panic!("Invalid unary operator {}", ch),
+    }
+}
+
 named!(program<Program>,
     map!(
         separated_list!(newline, ws!(add)),
@@ -53,7 +61,7 @@ named!(mul<Expr>, do_parse!(
     folded: fold_many0!(
         pair!(alt!(char!('*') | char!('/')), ws!(fact)),
         init,
-        |acc, (op, rhs) | Expr::BinOpExpr (
+        |acc, (op, rhs) | Expr::BinOpExpr(
             BinOpExpr {
                 op: bin_op_from_char(op),
                 lhs: Box::new(acc),
@@ -64,14 +72,31 @@ named!(mul<Expr>, do_parse!(
     (folded)
 ));
 
-named!(fact<Expr>,
+named!(unary<Expr>, map!(
+    ws!(
+        pair!(
+            alt!(char!('+') | char!('-')),
+            term
+        )
+    ),
+    |(op, c)| Expr::UnaryOpExpr(
+        UnaryOpExpr {
+            op: unary_op_from_char(op),
+            child: Box::new(c),
+        }
+    )
+));
+
+named!(fact<Expr>, alt!(unary | term));
+
+named!(term<Expr>,
     alt!(
         ws!(delimited!(char!('('), add, char!(')'))) |
-        map!(term, Expr::Constant)
+        map!(constant, Expr::Constant)
     )
 );
 
-named!(term<Constant>, do_parse!(
+named!(constant<Constant>, do_parse!(
     o: last_offset >>
     v: float >>
     (Constant::Num(Num {
