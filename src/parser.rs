@@ -4,7 +4,6 @@ use std::str::FromStr;
 use nom::{
     IResult,
     newline,
-    multispace,
     digit,
     Needed,
 };
@@ -12,8 +11,18 @@ use nom::{
 use ast::*;
 use error::Error;
 
-fn rest_input_len(input: &[u8]) -> IResult<&[u8], usize> {
+fn last_offset(input: &[u8]) -> IResult<&[u8], usize> {
     IResult::Done(input, input.len())
+}
+
+fn bin_op_from_char(ch: char) -> BinOp {
+    match ch {
+        '+' => BinOp::Add,
+        '-' => BinOp::Sub,
+        '*' => BinOp::Mul,
+        '/' => BinOp::Div,
+        _   => panic!("Invalid binary operator {}", ch),
+    }
 }
 
 named!(program<Program>,
@@ -63,11 +72,11 @@ named!(fact<Expr>,
 );
 
 named!(term<Constant>, do_parse!(
-    r: rest_input_len >>
+    o: last_offset >>
     v: float >>
     (Constant::Num(Num {
         value: v,
-        rest: r,
+        offset: o,
     }))
 ));
 
