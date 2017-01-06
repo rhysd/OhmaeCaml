@@ -1,12 +1,54 @@
+// Type t =
+//   | Unit
+//   | Bool of bool
+//   | Int of int
+//   | Float of float
+//   | Not of t
+//   | Neg of t
+//   | Add of t * t
+//   | Sub of t * t
+//   | FNeg of t
+//   | FAdd of t * t
+//   | FSub of t * t
+//   | FMul of t * t
+//   | FDiv of t * t
+//   | Eq of t * t
+//   | LE of t * t
+//   | If of t * t * t
+//   | Let of (Id.t * Type.t) * t * t
+//   | Var of Id.t
+//   | LetRec of fundef * t
+//   | App of t * t list
+//   | Tuple of t list
+//   | LetTuple of (Id.t * Type.t) list * t * t
+//   | Array of t * t
+//   | Get of t * t
+//   | Put of t * t * t
+// and fundef = { name : Id.t * Type.t; args : (Id.t * Type.t) list; body : t }
+
 use std::char;
 
 pub trait GetOffset {
     fn get_offset(&self) -> usize;
 }
 
-macro_rules! enum_nodes {
-    ($($n:ident { $($m:ident,)+ })+) => {
+macro_rules! enum_ast_nodes {
+    ($($n:ident { $($m:ident { $($f:ident: $t:ty,)* })+ })+) => {
         $(
+            $(
+                #[derive(Debug)]
+                pub struct $m {
+                    $($f: $t,)*
+                    pub offset: usize,
+                }
+                impl GetOffset for $m {
+                    #[inline]
+                    fn get_offset(&self) -> usize {
+                        self.offset
+                    }
+                }
+            )+
+
             #[derive(Debug)]
             pub enum $n {
                 $(
@@ -26,66 +68,110 @@ macro_rules! enum_nodes {
     }
 }
 
-enum_nodes! {
-    Expr {
-        Constant,
-        BinOpExpr,
-        UnaryOpExpr,
-    }
+// Note:
+// MinCaml only has expression nodes
 
-    Constant {
-        Num,
+enum_ast_nodes! {
+    Expr {
+        Constant {
+            value: ConstantValue,
+        }
+
+        BinOpExpr {
+            op: BinOp,
+            lhs: Box<Expr>,
+            rhs: Box<Expr>,
+        }
+
+        UnaryOpExpr {
+            op: UnaryOp,
+            child: Box<Expr>,
+        }
+
+        If {
+            cond: Box<Expr>,
+            then_clause: Box<Expr>,
+            else_clause: Box<Expr>,
+        }
+
+        Let {
+            name: String,
+            bound: Box<Expr>,
+            body: Box<Expr>,
+        }
+
+        Var {
+            name: String,
+        }
+
+        LetRec {
+            funcdef: Box<Fundef>, // It should be Rc
+            body: Box<Expr>,
+        }
+
+        Apply {
+            callee: Box<Expr>,
+            args: Vec<Expr>,
+        }
+
+        Tuple {
+            elems: Vec<Expr>,
+        }
+
+        LetTuple {
+            names: Vec<String>,
+            bound: Box<Expr>,
+            body: Box<Expr>,
+        }
+
+        Array {
+            size: Box<Expr>,
+            elem: Box<Expr>,
+        }
+
+        Get {
+            array: Box<Expr>,
+            index: Box<Expr>,
+        }
+
+        Put {
+            array: Box<Expr>,
+            index: Box<Expr>,
+            rhs: Box<Expr>,
+        }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
+pub enum ConstantValue {
+    Bool(bool),
+    Int(i32),
+    Float(f64),
+    Unit,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum UnaryOp {
+    Not,
+    Neg,
+    FNeg,
+}
+
+#[derive(Debug, PartialEq)]
 pub enum BinOp {
     Add,
     Sub,
-    Mul,
-    Div
+    FAdd,
+    FSub,
+    FMul,
+    FDiv,
+    Eq,
+    LE,
 }
 
 #[derive(Debug)]
-pub struct Num {
-    pub value: f64,
-    pub offset: usize,
+pub struct Fundef {
+    pub name: String,
+    pub args: Vec<String>,
+    pub body: Box<Expr>,
 }
-
-impl GetOffset for Num {
-    fn get_offset(&self) -> usize {
-        self.offset
-    }
-}
-
-#[derive(Debug)]
-pub struct BinOpExpr {
-    pub op: BinOp,
-    pub lhs: Box<Expr>,
-    pub rhs: Box<Expr>,
-}
-
-impl GetOffset for BinOpExpr {
-    fn get_offset(&self) -> usize {
-        (*self.lhs).get_offset()
-    }
-}
-
-#[derive(Debug)]
-pub enum UnaryOp {
-    Pos,
-    Neg,
-}
-
-#[derive(Debug)]
-pub struct UnaryOpExpr {
-    pub op: UnaryOp,
-    pub child: Box<Expr>,
-}
-
-impl GetOffset for UnaryOpExpr {
-    fn get_offset(&self) -> usize {
-        (*self.child).get_offset()
-    }
-}
-
