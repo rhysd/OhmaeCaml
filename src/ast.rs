@@ -49,6 +49,15 @@ macro_rules! enum_ast_nodes {
                         self.offset
                     }
                 }
+                impl $m {
+                    #[inline]
+                    pub fn expr($($f: $t,)* offset: usize) -> $n {
+                        $n::$m($m {
+                            $($f: $f,)*
+                            offset: offset,
+                        })
+                    }
+                }
             )+
 
             #[derive(Debug)]
@@ -107,7 +116,7 @@ enum_ast_nodes! {
         }
 
         LetRec {
-            funcdef: Box<Fundef>, // It should be Rc
+            funcdef: Fundef,
             body: Box<Expr>,
         }
 
@@ -163,17 +172,25 @@ pub enum UnaryOp {
 pub enum BinOp {
     Add,
     Sub,
+    Mul,
+    Div,
     FAdd,
     FSub,
     FMul,
     FDiv,
+    And,
+    Or,
     Eq,
-    LE,
+    NEq,
+    Less,
+    LessEq,
+    Greater,
+    GreaterEq,
 }
 
 #[derive(Debug)]
 pub struct Fundef {
     pub name: String,
-    pub args: Vec<String>,
+    pub params: Vec<String>,
     pub body: Box<Expr>,
 }
