@@ -1,8 +1,11 @@
+use std::char;
 use std::io;
 use std::fs;
 use std::io::Read;
 
-use ast;
+pub trait GetOffset {
+    fn get_offset(&self) -> usize;
+}
 
 #[derive(Debug, PartialEq)]
 pub struct Position {
@@ -20,7 +23,7 @@ pub enum Location {
 pub struct Source {
     code: String,
     pub byte_len: usize,
-    pub location: Location
+    pub location: Location,
     // Note:
     // Add indices of newlines to convert offset into line and column
 }
@@ -51,7 +54,7 @@ impl Source {
         self.code.as_str()
     }
 
-    pub fn position_from_offset<G: ast::GetOffset>(&self, g: G) -> Position {
+    pub fn position_from_offset<G: GetOffset>(&self, g: G) -> Position {
         let bytes = self.code.as_bytes();
         let offset = bytes.len() - g.get_offset();
 
@@ -71,9 +74,9 @@ impl Source {
         Position {line: l, column: c}
     }
 
-    pub fn source_location<G: ast::GetOffset>(&self, g: G) -> String {
+    pub fn source_location<G: GetOffset>(&self, g: G) -> String {
         let loc = match self.location {
-            Location::File(p) => p.as_str(),
+            Location::File(ref p) => p.as_str(),
             Location::Stdin => "<stdin>",
         };
         let pos = self.position_from_offset(g);

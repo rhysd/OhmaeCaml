@@ -26,10 +26,12 @@
 //   | Put of t * t * t
 // and fundef = { name : Id.t * Type.t; args : (Id.t * Type.t) list; body : t }
 
-use std::char;
+use source::GetOffset;
 
-pub trait GetOffset {
-    fn get_offset(&self) -> usize;
+#[derive(Debug)]
+pub struct AST {
+    pub root: Expr,
+    // Note: Other translation unit options can go here
 }
 
 macro_rules! enum_ast_nodes {
@@ -38,7 +40,7 @@ macro_rules! enum_ast_nodes {
             $(
                 #[derive(Debug)]
                 pub struct $m {
-                    $($f: $t,)*
+                    $(pub $f: $t,)*
                     pub offset: usize,
                 }
                 impl GetOffset for $m {
@@ -74,7 +76,7 @@ macro_rules! enum_ast_nodes {
 enum_ast_nodes! {
     Expr {
         Constant {
-            value: ConstantValue,
+            value: ConstValue,
         }
 
         BinOpExpr {
@@ -143,7 +145,7 @@ enum_ast_nodes! {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum ConstantValue {
+pub enum ConstValue {
     Bool(bool),
     Int(i32),
     Float(f64),

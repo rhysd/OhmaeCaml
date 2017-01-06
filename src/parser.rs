@@ -5,104 +5,43 @@ use nom::{
     IResult,
     newline,
     digit,
+    alpha,
+    alphanumeric,
     Needed,
 };
 
 use ast::*;
 use error::Error;
+use source::Source;
 
-fn last_offset(input: &[u8]) -> IResult<&[u8], usize> {
+fn offset(input: &[u8]) -> IResult<&[u8], usize> {
     IResult::Done(input, input.len())
 }
 
-fn bin_op_from_char(ch: char) -> BinOp {
-    match ch {
-        '+' => BinOp::Add,
-        '-' => BinOp::Sub,
-        '*' => BinOp::Mul,
-        '/' => BinOp::Div,
-        _   => unreachable!("Invalid binary operator {}", ch),
-    }
+pub struct Parser<'a> {
+    source: &'a Source,
 }
 
-fn unary_op_from_char(ch: char) -> UnaryOp {
-    match ch {
-        '-' => UnaryOp::Neg,
-        '+' => UnaryOp::Pos,
-        _ => unreachable!("Invalid unary operator {}", ch),
-    }
-}
-
-named!(program<Program>,
-    map!(
-        separated_list!(newline, ws!(add)),
-        |es| Program { body: es }
-    )
-);
-
-named!(add<Expr>, do_parse!(
-    init: ws!(mul) >>
-    folded: fold_many0!(
-        pair!(alt!(char!('+') | char!('-')), ws!(mul)),
-        init,
-        |acc, (op, rhs)| Expr::BinOpExpr (
-            BinOpExpr {
-                op: bin_op_from_char(op),
-                lhs: Box::new(acc),
-                rhs: Box::new(rhs)
-            }
-        )
-    ) >>
-    (folded)
-));
-
-named!(mul<Expr>, do_parse!(
-    init: ws!(fact) >>
-    folded: fold_many0!(
-        pair!(alt!(char!('*') | char!('/')), ws!(fact)),
-        init,
-        |acc, (op, rhs) | Expr::BinOpExpr(
-            BinOpExpr {
-                op: bin_op_from_char(op),
-                lhs: Box::new(acc),
-                rhs: Box::new(rhs)
-            }
-        )
-    ) >>
-    (folded)
-));
-
-named!(unary<Expr>, map!(
-    ws!(
-        pair!(
-            alt!(char!('+') | char!('-')),
-            term
-        )
+named!(integer<ConstValue>, map!(
+    map_res!(
+        map_res!(
+            digit,
+            str::from_utf8
+        ),
+        FromStr::from_str
     ),
-    |(op, c)| Expr::UnaryOpExpr(
-        UnaryOpExpr {
-            op: unary_op_from_char(op),
-            child: Box::new(c),
-        }
-    )
-));
-
-named!(fact<Expr>, alt!(unary | term));
-
-named!(term<Expr>,
-    alt!(
-        ws!(delimited!(char!('('), add, char!(')'))) |
-        map!(constant, Expr::Constant)
-    )
+    ConstValue::Int)
 );
 
-named!(constant<Constant>, do_parse!(
-    o: last_offset >>
-    v: float >>
-    (Constant::Num(Num {
-        value: v,
-        offset: o,
-    }))
+named!(unit<ConstValue>, do_parse!(
+    ws!(pair!(char!('('), char!(')'))) >>
+    (ConstValue::Unit)
+));
+
+named!(boolean<ConstValue>, do_parse!(
+    b: alt!(tag!(b"true") | tag!(b"false")) >>
+    not!(peek!(alphanumeric)) >>
+    (ConstValue::Bool(true))
 ));
 
 named!(consume_frac<()>, do_parse!(
@@ -116,23 +55,74 @@ named!(consume_exp<()>, do_parse!(
     ()
 ));
 
-named!(float<f64>, map_res!(
-    map_res!(
-        recognize!(
-            delimited!(
-                digit,
-                opt!(complete!(consume_frac)),
-                opt!(complete!(consume_exp))
-            )
+named!(float<ConstValue>,
+    map!(
+        map_res!(
+            map_res!(
+                recognize!(
+                    delimited!(
+                        digit,
+                        opt!(complete!(consume_frac)),
+                        opt!(complete!(consume_exp))
+                    )
+                ),
+                str::from_utf8
+            ),
+            FromStr::from_str
         ),
-        str::from_utf8
-    ),
-    FromStr::from_str
+        ConstValue::Float
+    )
+);
+
+named!(identifier<String>,
+    map!(
+        map_res!(
+            recognize!(
+                pair!(alpha, many0!(alphanumeric))
+            ),
+            str::from_utf8
+        ),
+        String::from
+    )
+);
+
+named!(var<Var>,
+    map!(
+        pair!(offset, identifier),
+        |(o, i)| Var {name: i, offset: o}
+    )
+);
+
+named!(constant<Constant>, do_parse!(
+    o: offset >>
+    v: alt!(unit | boolean | float | integer) >>
+    (Constant { value: v, offset: o })
 ));
 
-pub fn parse<S: AsRef<str>>(input: S) -> Result<Program, Error> {
-    match program(input.as_ref().as_bytes()) {
-        IResult::Done(_, p) => Ok(p),
+/* TODO
+named!(get<Get>, ws!(do_parse!(
+    o: offset >>
+    l: paren_less_expr >>
+    char!('.') >>
+    char!('(') >> 
+    i: expr >>
+    char!(')') >>
+    (Get {array: Box::new(l), i: Box::new(i), offset: o})
+)));
+*/
+
+named!(paren_less_expr<Expr>,
+    alt!(
+        /* TODO: delimited!(char!('('), expr , char!(')')) */
+        map!(constant, Expr::Constant) |
+        map!(var, Expr::Var)
+        /* TODO: map!(get, Expr::Get) */
+    )
+);
+
+pub fn parse<S: AsRef<str>>(code: S) -> Result<AST, Error> {
+    match paren_less_expr(code.as_ref().as_bytes()) {
+        IResult::Done(_, p) => Ok(AST {root: p}),
         IResult::Error(err) => Err(Error::OnParse { msg: format!("Parse error: {}", err) }),
         IResult::Incomplete(Needed::Size(n)) => Err(Error::OnParse { msg: format!("Parsed incomplete input: More {} bytes are needed", n) }),
         IResult::Incomplete(Needed::Unknown) => Err(Error::OnParse { msg: "Parsed incomplete input".to_string() }),

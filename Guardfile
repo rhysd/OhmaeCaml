@@ -1,3 +1,5 @@
+# Note: Workaround for MBP 2016 late because cargo-watch doesn't work on it
+
 def run(f)
   puts "\033[93m#{Time.now}: #{f}\033[0m"
   success = system 'cargo build --verbose'

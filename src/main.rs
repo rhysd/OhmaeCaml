@@ -14,7 +14,8 @@ use compiler::Compiler;
 use source::Source;
 
 fn main() {
-    let read = match env::args().next() {
+    // Note: Skip first argument (program name)
+    let read = match env::args().nth(1) {
         Some(arg) => Source::from_file(arg),
         None => Source::from_stdin(),
     };
@@ -27,8 +28,8 @@ fn main() {
         },
     };
 
-    let compiler = Compiler::new(source.code());
-    let ret = match compiler.parse() {
+    let compiler = Compiler {};
+    let ret = match compiler.parse(&source) {
         Ok(ast) => {
             println!("AST: {:?}", ast);
             0
