@@ -1,38 +1,7 @@
 use std::char;
 
-#[derive(Debug, PartialEq)]
-pub struct Position {
-    pub line: usize,
-    pub column: usize,
-}
-
 pub trait GetOffset {
     fn get_offset(&self) -> usize;
-}
-
-pub fn get_pos<S: AsRef<str>, G: GetOffset>(s: S, g: G) -> Position {
-    let bytes = s.as_ref().as_bytes();
-    let offset = bytes.len() - g.get_offset();
-
-    let mut l = 1usize;
-    let mut c = 1usize;
-    for b in &bytes[..offset] {
-        match char::from_u32(*b as u32) {
-            Some('\n') => {
-                l += 1;
-                c = 1;
-            },
-            Some(_) | None => {
-                c += 1;
-            }
-        }
-    }
-    Position {line: l, column: c}
-}
-
-#[derive(Debug)]
-pub struct Program {
-    pub body: Vec<Expr>,
 }
 
 macro_rules! enum_nodes {
