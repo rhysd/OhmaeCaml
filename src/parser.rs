@@ -16,13 +16,25 @@ fn offset(input: &[u8]) -> IResult<&[u8], usize> {
     IResult::Done(input, input.len())
 }
 
+#[allow(dead_code)]
+macro_rules! named_dbg {
+    ($name:ident<$o:ty>, $submac:ident!( $($args:tt)* )) => (
+        named!($name<$o>, dbg!(
+            $submac!( $($args)* )
+        ));
+    );
+}
+
 named!(comment<()>, do_parse!(
     tag!("(*") >>
     take_until!("*)") >>
     ()
 ));
 
-named!(whitespace<()>, do_parse!(one_of_bytes!(b" \t\n\r") >> ()));
+named!(whitespace<()>, do_parse!(
+    one_of_bytes!(b" \t\n\r") >>
+    ()
+));
 
 named!(spaces<()>, do_parse!(
     many1!(alt!(whitespace | comment)) >> ()
@@ -294,29 +306,38 @@ named!(unary<Expr>, alt!(
     postfix
 ));
 
-named!(put<Expr>, do_parse!(
-    lhs: paren_less_expr >>
-    o: offset >>
+enum PostFix {
+    Put(Expr, Expr),
+    Apply(Vec<Expr>),
+}
+
+named!(put_postfix<PostFix>, do_parse!(
     ws!(char!('.')) >>
     ws!(char!('(')) >>
     index: expr >>
     ws!(char!(')')) >>
     ws!(tag!("<-")) >>
     rhs: expr >>
-    (Put::expr(Box::new(lhs), Box::new(index), Box::new(rhs), o))
+    (PostFix::Put(index, rhs))
 ));
 
-named!(apply<Expr>, do_parse!(
-    o: offset >>
-    callee: expr >>
+named!(apply_postfix<PostFix>, do_parse!(
     spaces >>
     args: separated_nonempty_list!(spaces, paren_less_expr) >>
-    (Apply::expr(Box::new(callee), args, o))
+    (PostFix::Apply(args))
 ));
 
-named!(postfix<Expr>, alt!(
-    put |
-    apply
+named!(postfix<Expr>, do_parse!(
+    init: paren_less_expr >>
+    folded: fold_many0!(
+        alt!(put_postfix | apply_postfix),
+        init,
+        |lhs, pf| match pf {
+            PostFix::Put(index, rhs) => Put::expr(Box::new(lhs), Box::new(index), Box::new(rhs), 0),
+            PostFix::Apply(args) => Apply::expr(Box::new(lhs), args, 0),
+        }
+    ) >>
+    (folded)
 ));
 
 named!(array<Expr>, do_parse!(
@@ -413,8 +434,6 @@ named!(primary_expr<Expr>, alt!(
     let_rec |
     let_ |
     tuple |
-    put |
-    apply |
     logical_or
 ));
 
