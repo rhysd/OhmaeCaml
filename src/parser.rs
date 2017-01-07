@@ -84,7 +84,7 @@ named!(float<ConstValue>,
                 recognize!(
                     delimited!(
                         digit,
-                        opt!(complete!(consume_frac)),
+                        complete!(consume_frac),
                         opt!(complete!(consume_exp))
                     )
                 ),
@@ -417,33 +417,38 @@ named!(let_<Expr>, do_parse!(
     (Let::expr(name, Box::new(bound), Box::new(body), o))
 ));
 
-named!(tuple<Expr>,
-    map!(
-        pair!(
-            offset,
-            ws!(separated_nonempty_list!(char!(','), expr))
-        ),
-        |(o, elems)| Tuple::expr(elems, o)
-    )
-);
-
 named!(primary_expr<Expr>, alt!(
     array |
     if_ |
     let_tuple |
     let_rec |
     let_ |
-    tuple |
     logical_or
 ));
 
+fn tuple_or_primary(head: Expr, mut tail: Vec<Expr>, offset: usize) -> Expr {
+    if tail.len() == 0 {
+        head
+    } else {
+        tail.insert(0, head);
+        Tuple::expr(tail, offset)
+    }
+}
+
+named!(tuple<Expr>, do_parse!(
+    o: offset >>
+    head: primary_expr >>
+    tail: many0!(ws!(preceded!(char!(','), primary_expr))) >>
+    (tuple_or_primary(head, tail, o))
+));
+
 named!(expr<Expr>, do_parse!(
-    init: primary_expr >>
+    init: tuple >>
     folded:fold_many0!(
         do_parse!(
             o: offset >>
             ws!(char!(';')) >>
-            rhs: primary_expr >>
+            rhs: tuple >>
             (o, rhs)
         ),
         init,
