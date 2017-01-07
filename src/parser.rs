@@ -6,7 +6,6 @@ use nom::{
     digit,
     alpha,
     alphanumeric,
-    multispace,
     Needed,
 };
 
@@ -16,6 +15,22 @@ use error::Error;
 fn offset(input: &[u8]) -> IResult<&[u8], usize> {
     IResult::Done(input, input.len())
 }
+
+named!(comment<()>, do_parse!(
+    tag!("(*") >>
+    take_until!("*)") >>
+    ()
+));
+
+named!(whitespace<()>, do_parse!(one_of_bytes!(b" \t\n\r") >> ()));
+
+named!(spaces<()>, do_parse!(
+    many1!(alt!(whitespace | comment)) >> ()
+));
+
+named!(opt_spaces<()>, do_parse!(
+    many0!(alt!(whitespace | comment)) >> ()
+));
 
 named!(integer<ConstValue>, map!(
     map_res!(
@@ -69,24 +84,27 @@ named!(float<ConstValue>,
     )
 );
 
-named!(keywords<&[u8]>, alt!(
-    tag!("true") |
-    tag!("false") |
-    tag!("if") |
-    tag!("then") |
-    tag!("else") |
-    tag!("let") |
-    tag!("rec") |
-    tag!("in")
+named!(keyword<&[u8]>, do_parse!(
+    k: alt!(
+        tag!("true") |
+        tag!("false") |
+        tag!("if") |
+        tag!("then") |
+        tag!("else") |
+        tag!("let") |
+        tag!("rec") |
+        tag!("in")
+    ) >>
+    not!(peek!(alphanumeric)) >>
+    (k)
 ));
 
-// TODO: Except for keywords
 named!(identifier<String>,
     map!(
         map_res!(
             recognize!(
                 do_parse!(
-                    not!(keywords) >>
+                    not!(keyword) >>
                     alpha >>
                     many0!(alphanumeric) >>
                     ()
@@ -134,10 +152,10 @@ named!(logical_or<Expr>, do_parse!(
     init: logical_and >>
     folded: fold_many0!(
         do_parse!(
-            opt!(multispace) >>
+            opt_spaces >>
             o: offset >>
             tag!(b"||") >>
-            opt!(multispace) >>
+            opt_spaces >>
             rhs: logical_and >>
             ((o, rhs))
         ),
@@ -151,10 +169,10 @@ named!(logical_and<Expr>, do_parse!(
     init: equal >>
     folded: fold_many0!(
         do_parse!(
-            opt!(multispace) >> 
+            opt_spaces >> 
             o: offset >>
             tag!(b"&&") >>
-            opt!(multispace) >>
+            opt_spaces >>
             rhs: equal >>
             ((o, rhs))
         ),
@@ -173,10 +191,10 @@ named!(equal<Expr>, do_parse!(
     init: relational >>
     folded: fold_many0!(
         do_parse!(
-            opt!(multispace) >>
+            opt_spaces >>
             o: offset >>
             op: equal_op >>
-            opt!(multispace) >>
+            opt_spaces >>
             rhs: relational >>
             ((o, op, rhs))
         ),
@@ -197,10 +215,10 @@ named!(relational<Expr>, do_parse!(
     init: additive >>
     folded: fold_many0!(
         do_parse!(
-            opt!(multispace) >>
+            opt_spaces >>
             o: offset >>
             op: relational_op >>
-            opt!(multispace) >>
+            opt_spaces >>
             rhs: additive >>
             ((o, op, rhs))
         ),
@@ -221,10 +239,10 @@ named!(additive<Expr>, do_parse!(
     init: mult >>
     folded: fold_many0!(
         do_parse!(
-            opt!(multispace) >>
+            opt_spaces >>
             o: offset >>
             op: additive_op >>
-            opt!(multispace) >>
+            opt_spaces >>
             rhs: mult >>
             ((o, op, rhs))
         ),
@@ -245,10 +263,10 @@ named!(mult<Expr>, do_parse!(
     init: unary >>
     folded: fold_many0!(
         do_parse!(
-            opt!(multispace) >>
+            opt_spaces >>
             o: offset >>
             op: mult_op >>
-            opt!(multispace) >>
+            opt_spaces >>
             rhs: unary >>
             ((o, op, rhs))
         ),
@@ -267,9 +285,9 @@ named!(unary_op<UnaryOp>, alt!(
 named!(unary<Expr>, alt!(
     do_parse!(
         o: offset >>
-        opt!(multispace) >>
+        opt_spaces >>
         op: unary_op >>
-        opt!(multispace) >>
+        opt_spaces >>
         child: unary >>
         (UnaryOpExpr::expr(op, Box::new(child), o))
     ) |
@@ -291,8 +309,8 @@ named!(put<Expr>, do_parse!(
 named!(apply<Expr>, do_parse!(
     o: offset >>
     callee: expr >>
-    multispace >>
-    args: separated_nonempty_list!(multispace, paren_less_expr) >>
+    spaces >>
+    args: separated_nonempty_list!(spaces, paren_less_expr) >>
     (Apply::expr(Box::new(callee), args, o))
 ));
 
@@ -304,9 +322,9 @@ named!(postfix<Expr>, alt!(
 named!(array<Expr>, do_parse!(
     o: offset >>
     tag!("Array.create") >>
-    multispace >>
+    spaces >>
     size: paren_less_expr >>
-    multispace >>
+    spaces >>
     elem: paren_less_expr >>
     (Array::expr(Box::new(size), Box::new(elem), o))
 ));
@@ -314,13 +332,13 @@ named!(array<Expr>, do_parse!(
 named!(if_<Expr>, do_parse!(
     o: offset >>
     tag!("if") >>
-    multispace >>
+    spaces >>
     cond: expr >>
-    multispace >>
+    spaces >>
     tag!("then") >>
-    multispace >>
+    spaces >>
     then: expr >>
-    multispace >>
+    spaces >>
     tag!("else") >>
     expr >>
     otherwise: expr >>
@@ -331,21 +349,21 @@ named!(if_<Expr>, do_parse!(
 named!(let_tuple<Expr>, do_parse!(
     o: offset >>
     names: ws!(delimited!(char!('('), separated_nonempty_list!(char!(','), identifier), char!(')'))) >>
-    opt!(multispace) >>
+    opt_spaces >>
     char!('=') >>
-    opt!(multispace) >>
+    opt_spaces >>
     bound: expr >>
-    multispace >>
+    spaces >>
     tag!("in") >>
-    multispace >>
+    spaces >>
     body: expr >>
     (LetTuple::expr(names, Box::new(bound), Box::new(body), o))
 ));
 
 named!(fundef<Fundef>, do_parse!(
     n: identifier >>
-    p: many0!(do_parse!(multispace >> arg: identifier >> (arg))) >>
-    multispace >>
+    p: many0!(do_parse!(spaces >> arg: identifier >> (arg))) >>
+    spaces >>
     b: expr >>
     (Fundef { name: n, params: p, body: Box::new(b) })
 ));
@@ -353,13 +371,13 @@ named!(fundef<Fundef>, do_parse!(
 named!(let_rec<Expr>, do_parse!(
     o: offset >>
     tag!("let") >>
-    multispace >>
+    spaces >>
     tag!("rec") >>
-    multispace >>
+    spaces >>
     fun: fundef >>
-    multispace >>
+    spaces >>
     tag!("in") >>
-    multispace >>
+    spaces >>
     body: expr >>
     (LetRec::expr(fun, Box::new(body), o))
 ));
@@ -367,13 +385,13 @@ named!(let_rec<Expr>, do_parse!(
 named!(let_<Expr>, do_parse!(
     o: offset >>
     tag!("let") >>
-    multispace >>
+    spaces >>
     name: identifier >>
     ws!(char!('=')) >>
     bound: expr >>
-    multispace >>
+    spaces >>
     tag!("in") >>
-    multispace >>
+    spaces >>
     body: expr >>
     (Let::expr(name, Box::new(bound), Box::new(body), o))
 ));
