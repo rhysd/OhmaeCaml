@@ -69,12 +69,28 @@ named!(float<ConstValue>,
     )
 );
 
+named!(keywords<&[u8]>, alt!(
+    tag!("true") |
+    tag!("false") |
+    tag!("if") |
+    tag!("then") |
+    tag!("else") |
+    tag!("let") |
+    tag!("rec") |
+    tag!("in")
+));
+
 // TODO: Except for keywords
 named!(identifier<String>,
     map!(
         map_res!(
             recognize!(
-                pair!(alpha, many0!(alphanumeric))
+                do_parse!(
+                    not!(keywords) >>
+                    alpha >>
+                    many0!(alphanumeric) >>
+                    ()
+                )
             ),
             str::from_utf8
         ),
